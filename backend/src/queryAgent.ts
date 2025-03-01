@@ -137,6 +137,8 @@ async function setupQueryEndpoint(): Promise<void> {
   app.use(express.json());
   
   // Query endpoint
+  //@ts-ignore
+  
   app.post('/api/medical-query', async (req: Request, res: Response) => {
     try {
       const patientData = req.body;

@@ -1,4 +1,5 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
+import { Request, Response } from 'express-serve-static-core';
 import mongoose from 'mongoose';
 import bodyParser from 'body-parser';
 import { ingestMedicalData } from './dataIngestionAgent';
@@ -8,6 +9,7 @@ const app = express();
 app.use(bodyParser.json());
 
 // Route to start the medical data ingestion process
+//@ts-ignore
 app.post('/api/ingest-medical-data', async (req: Request, res: Response) => {
   try {
     const { urls }: { urls?: string[] } = req.body;
@@ -29,7 +31,7 @@ app.post('/api/ingest-medical-data', async (req: Request, res: Response) => {
 });
 
 // Health check endpoint to verify if the server is running
-app.get('/api/health', (req: Request, res: Response) => {
+app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
