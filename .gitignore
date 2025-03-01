@@ -1,0 +1,52 @@
+# Root-level ignores
+node_modules/
+pnpm-lock.yaml
+yarn.lock
+package-lock.json
+.DS_Store
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.vscode/
+.idea/
+*.log
+npm-debug.log*
+lerna-debug.log*
+/dist
+/out
+/build
+/.turbo
+/.cache
+/.next
+/.vercel
+/.eslintcache
+
+# Frontend (Next.js) specific
+frontend/.next/
+frontend/out/
+frontend/.turbo/
+frontend/node_modules/
+frontend/.env*
+frontend/.cache
+
+# Backend (Node.js) specific
+backend/node_modules/
+backend/dist/
+backend/.env*
+backend/.cache
+backend/logs
+backend/debug.log
+backend/npm-debug.log*
+backend/yarn-debug.log*
+backend/.turbo/
+backend/.vercel
+backend/.eslintcache
+
+# Logs
+logs/
+*.log
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
