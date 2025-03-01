@@ -1,70 +1,73 @@
-# TEAM NAME : PENGUINS
-# PS ID : 03
-# Medical Diagnosis System
+# Clinical Decision Support System
 
-A comprehensive solution for medical professionals to diagnose patients using AI-powered analysis of symptoms, patient history, and up-to-date medical information.
+## 🏆 PCCOE GDGC AB 02 Hackathon 2025 - Problem Statement #3 
+### Team PENGUINS
 
-## Overview
+## 🔍 Problem Statement #3
+*ENHANCING CLINICAL DECISION
+SUPPORT SYSTEMS WITH RETRIEVAL-
+AUGMENTED GENERATION (RAG) MODEL*
 
-This system helps doctors diagnose patients by:
-1. Storing and managing patient metadata
-2. Analyzing symptoms against patient history
-3. Leveraging an AI RAG agent to query medical databases
-4. Continuously updating medical knowledge through web scraping
+## 📋 Project Overview
 
-## Architecture
+AI-Powered Clinical Support is an intelligent medical diagnosis assistant designed to help doctors make more informed decisions by analyzing patient symptoms against their medical history and up-to-date medical research. Our solution combines the power of Next.js, AI-powered RAG (Retrieval-Augmented Generation), and intelligent web scraping to create a comprehensive diagnostic tool.
 
-### Frontend (Next.js)
-- Doctor signup/login portal
-- Patient management dashboard
-- Symptom input interface
-- Diagnosis results display
+### Key Features:
+
+- *Smart Patient Management*: Doctors can register patients with comprehensive metadata
+- *AI-Powered Symptom Analysis*: Input symptoms to receive AI-assisted diagnosis suggestions
+- *Self-Updating Medical Knowledge*: Automatic web scraping keeps the system updated with latest medical information
+- *Intuitive UI*: Clean, professional interface designed for busy medical professionals
+
+## 💻 Tech Stack
+
+### Frontend
+- *Next.js & React*: For building a fast, responsive user interface
+- *TailwindCSS*: For sleek, modern styling
+- *SWR*: For efficient data fetching and caching
 
 ### Backend
-- RESTful API endpoints
-- Two AI agents:
-  1. *Diagnosis Agent*: RAG-based system that analyzes symptoms against patient data
-  2. *Knowledge Agent*: Web scraper that updates the database with recent medical information
-
-### Database
-- MongoDB for storing:
-  - Patient records
-  - Medical knowledge base
-  - Diagnosis history
-
-## Features
-
-- *Doctor Onboarding*: Simple signup process for medical professionals
-- *Patient Management*: Add and update patient metadata
-- *Symptom Analysis*: Input symptoms and receive AI-assisted diagnosis
-- *Knowledge Base*: Continuously updated medical information via web scraping
-- *Historical View*: Track patient diagnosis history
-
-## Technology Stack
-
-- *Frontend*: Next.js, React, TailwindCSS
-- *Backend*: Node.js, Express
-- *Database*: MongoDB
+- *Node.js & Express*: For robust API endpoints
+- *MongoDB*: For flexible data storage
 - *AI Components*: 
   - RAG-based symptom analyzer
-  - Web scraping knowledge updater
+  - Web scraping knowledge updater with summarization capabilities
 
-## Setup & Installation
+## 🏗 Architecture
+
+
+┌─────────────┐         ┌─────────────┐         ┌─────────────┐
+│   Next.js   │  ───►   │  Node.js    │  ───►   │  MongoDB    │
+│  Frontend   │  ◄───   │  Backend    │  ◄───   │  Database   │
+└─────────────┘         └─────────────┘         └─────────────┘
+                             │   ▲
+                             ▼   │
+                        ┌─────────────┐
+                        │ AI Agents   │
+                        │ - RAG       │
+                        │ - Scraper   │
+                        └─────────────┘
+
+
+## 🚀 Installation & Setup
 
 ### Prerequisites
 - Node.js (v16+)
 - MongoDB
 
-### Installation Steps
+### Getting Started
 
 1. Clone the repository
 bash
-git clone https://github.com/yourusername/medical-diagnosis-system.git
-cd medical-diagnosis-system
+git clone https://github.com/team-penguins/mediassist-ai.git
+cd mediassist-ai
 
 
 2. Install dependencies
 bash
+# Install root dependencies
+npm install
+
 # Install frontend dependencies
 cd frontend
 npm install
@@ -74,71 +77,60 @@ cd ../backend
 npm install
 
 
-3. Configure environment variables
+3. Set up environment variables
 bash
-# Create .env.local in frontend directory
-# Create .env in backend directory
+# Frontend (.env.local)
+cp frontend/.env.example frontend/.env.local
+
+# Backend (.env)
+cp backend/.env.example backend/.env
 
 
-4. Start the development servers
+4. Start development servers
 bash
-# Start frontend
+# Start both frontend and backend (from root directory)
+npm run dev
+
+# Or start separately
+# Frontend
 cd frontend
 npm run dev
 
-# Start backend
-cd ../backend
+# Backend
+cd backend
 npm run dev
 
 
-## API Endpoints
+5. Visit http://localhost:3000 to access the application
 
-### Authentication
-- POST /api/auth/signup - Doctor registration
-- POST /api/auth/login - Doctor login
+## 🔄 Workflow
 
-### Patients
-- GET /api/patients - Get all patients
-- POST /api/patients - Add new patient
-- GET /api/patients/:id - Get patient details
-- PUT /api/patients/:id - Update patient information
+1. *Doctor Registration*: Healthcare professionals register with their credentials
+2. *Patient Onboarding*: Doctors add patient metadata (history, allergies, conditions)
+3. *Symptom Analysis*:
+   - Select patient from dashboard
+   - Enter observed symptoms
+   - Click "Analyze" to process
+4. *Diagnosis Generation*:
+   - RAG agent queries patient history and medical knowledge base
+   - System returns potential diagnoses with confidence levels
+   - References to supporting medical literature provided
+5. *Knowledge Base Updates*:
+   - System continuously scrapes reliable medical sources
+   - Information is processed, summarized, and stored
+   - Database is enriched with latest medical findings
 
-### Diagnosis
-- POST /api/diagnosis - Analyze symptoms and generate diagnosis
-- GET /api/diagnosis/history/:patientId - Get diagnosis history for a patient
+## 📊 Project Structure
 
-## Data Flow
+## 🛠 Future Enhancements
 
-1. Doctor registers and logs into the system
-2. Doctor adds patient metadata during registration
-3. When diagnosing:
-   - Doctor selects a patient from dashboard
-   - Doctor inputs observed symptoms
-   - System sends symptom data to backend
-   - RAG agent queries MongoDB for patient history and relevant medical knowledge
-   - System returns diagnosis suggestions
+- Real-time collaboration between healthcare professionals
+- Integration with wearable devices for continuous monitoring
+- Expanded language support for global accessibility
+- Medical imaging analysis capabilities
 
-5. In parallel:
-   - Knowledge agent periodically scrapes medical websites
-   - Processes information into summarized context and key points
-   - Updates MongoDB with new medical information
+## 🙏 Acknowledgements
 
-## Security Considerations
-
-- HIPAA compliance for patient data
-- Secure authentication for doctors
-- Encrypted data transmission
-- Regular security audits
-
-## Future Enhancements
-
-- Mobile application for doctors
-- Integration with electronic health record (EHR) systems
-- Advanced analytics dashboard
-- Telemedicine features
-
-## Maintenance
-
-- Regular updates to the web scraping agent to adapt to source website changes
-- Database optimization for growing patient records
-- Performance monitoring and scaling as needed
+- PCCOE GDGC Club for organizing this hackathon
+- Our mentors for their valuable guidance
+- Open source medical datasets that helped train our models
