@@ -1,177 +1,208 @@
-import express, { Request, Response } from 'express';
-import mongoose, { Schema, Document } from 'mongoose';
-import { ChatOpenAI } from '@langchain/openai';
-import { PromptTemplate } from '@langchain/core/prompts';
-import dotenv from 'dotenv';
+// Query Agent - Updated to use DeepSeek R1 instead of OpenAI
 
-dotenv.config(); // Load environment variables
+import express from 'express';
+import { Request, Response } from 'express-serve-static-core';
+import mongoose from 'mongoose';
+import { ChatDeepSeek } from '@langchain/deepseek';
 
-// Define TypeScript interfaces for the medical data model
-interface ITreatment {
-  drugName: string;
-  dosage?: string;
-  frequency?: string;
-  sideEffects?: string[];
-  contraindications?: string[];
-}
-
-interface IMedicalData extends Document {
-  diseaseName: string;
-  symptoms: string[];
-  causes?: string[];
-  riskFactors?: string[];
-  treatments?: ITreatment[];
-  preventionMethods?: string[];
-  relatedConditions?: string[];
-  metadata: {
-    source?: string;
-    lastUpdated?: Date;
-    confidence?: number;
-  };
-}
-
-// Define Mongoose schema
-const MedicalDataSchema = new Schema<IMedicalData>({
-  diseaseName: { type: String, required: true, index: true },
-  symptoms: [{ type: String, index: true }],
-  causes: [String],
-  riskFactors: [String],
-  treatments: [{
-    drugName: { type: String, index: true },
+// MongoDB Schema (should match the one in dataIngestionAgent.ts)
+const MedicalSchema = new mongoose.Schema({
+  disease: { type: String, required: true, index: true },
+  symptoms: [String],
+  treatments: [String],
+  medications: [{
+    name: String,
     dosage: String,
-    frequency: String,
-    sideEffects: [String],
-    contraindications: [String]
+    sideEffects: [String]
   }],
-  preventionMethods: [String],
-  relatedConditions: [{ type: String, index: true }],
-  metadata: {
-    source: String,
-    lastUpdated: { type: Date, default: Date.now },
-    confidence: Number
-  }
-}, { timestamps: true });
-
-const MedicalData = mongoose.model<IMedicalData>('MedicalData', MedicalDataSchema);
-
-// Initialize LLM for response generation
-const llm = new ChatOpenAI({
-  model: 'gpt-4o',
-  temperature: 0.4
+  updatedAt: { type: Date, default: Date.now }
 });
 
-// Prompt template for generating medical responses
-const treatmentRecommendationPrompt = PromptTemplate.fromTemplate(`
-You are a medical information assistant. Your role is to provide relevant information based on patient data and medical knowledge.
-DO NOT give direct medical advice or prescriptions. Always recommend consulting with a healthcare professional.
+// Create text indexes for better search
+MedicalSchema.index({ disease: 'text', 'symptoms': 'text' });
 
-Patient Information:
-- Medical History: {medicalHistory}
-- Current Medications: {currentMedications}
-- Known Allergies: {knownAllergies}
-- Current Symptoms: {currentSymptoms}
+const MedicalData = mongoose.model('MedicalData', MedicalSchema);
 
-Relevant Medical Information from our database:
-{relevantMedicalData}
+// Initialize DeepSeek LLM
+const llm = new ChatDeepSeek({
+  modelName: "deepseek-ai/deepseek-llm-67b-chat", // Using the 67B model - adjust as needed
+  temperature: 0.4, // Slightly higher temperature for more diverse responses
+  apiKey: process.env.DEEPSEEK_API_KEY,
+  baseURL: process.env.DEEPSEEK_API_BASE_URL,
+});
 
-Based on this information, provide a clear, informative response that:
-1. Acknowledges the symptoms and concerns.
-2. Provides educational information about possible related conditions.
-3. Explains general treatment approaches commonly used for these symptoms/conditions.
-4. Emphasizes the importance of professional medical consultation.
-5. Provides general wellness recommendations if appropriate.
-
-Your response should be informative, compassionate, and educational while avoiding direct diagnosis or treatment recommendations.
-`);
-
-// Function to search for relevant medical data
-async function searchMedicalDatabase(patientData: {
-  symptoms?: string[];
-  diseases?: string[];
-  drugs?: string[];
-}): Promise<IMedicalData[]> {
+// Search database for relevant medical information
+async function searchMedicalDatabase(patientData: any): Promise<any[]> {
   try {
-    const { symptoms = [], diseases = [], drugs = [] } = patientData;
-    const query: any = { $or: [] };
+    const { symptoms = [], diseases = [], medications = [] } = patientData;
     
-    if (symptoms.length) query.$or.push({ symptoms: { $in: symptoms } });
-    if (diseases.length) query.$or.push({ diseaseName: { $in: diseases } });
-    if (drugs.length) query.$or.push({ 'treatments.drugName': { $in: drugs } });
+    // Build search queries
+    let query: any = {};
     
-    if (!query.$or.length) return [];
+    if (symptoms.length > 0 || diseases.length > 0 || medications.length > 0) {
+      const conditions = [];
+      
+      if (symptoms.length > 0) {
+        conditions.push({ symptoms: { $in: symptoms } });
+      }
+      
+      if (diseases.length > 0) {
+        conditions.push({ disease: { $in: diseases } });
+      }
+      
+      if (medications.length > 0) {
+        conditions.push({ 'medications.name': { $in: medications } });
+      }
+      
+      query = { $or: conditions };
+    }
     
-    return await MedicalData.find(query).limit(5);
+    // Execute search
+    let results = await MedicalData.find(query).limit(5);
+    
+    // If no direct matches, try text search
+    if (results.length === 0) {
+      const searchTerms = [...symptoms, ...diseases, ...medications].join(' ');
+      if (searchTerms.trim()) {
+        results = await MedicalData.find(
+          { $text: { $search: searchTerms } },
+          { score: { $meta: "textScore" } }
+        ).sort({ score: { $meta: "textScore" } }).limit(3);
+      }
+    }
+    
+    return results;
   } catch (error) {
-    console.error('Error searching medical database:', error);
+    console.error("Database search error:", error);
     return [];
   }
 }
 
-// Format medical data for LLM input
-function formatMedicalDataForLLM(results: IMedicalData[]): string {
-  if (!results.length) {
-    return 'No specific medical information found matching the patients profile.';
+// Format medical data for the LLM prompt
+function formatMedicalData(results: any[]): string {
+  if (!results || results.length === 0) {
+    return "No specific medical information found in our database.";
   }
   
-  return results.map((result, index) => `
-CONDITION ${index + 1}: ${result.diseaseName}
-- Symptoms: ${result.symptoms.join(', ')}
-${result.causes?.length ? `- Causes: ${result.causes.join(', ')}` : ''}
-- Treatments: ${result.treatments?.map(t => `  * ${t.drugName} (${t.dosage || 'N/A'}, ${t.frequency || 'N/A'})`).join('\n') || 'Not available'}
-${result.preventionMethods?.length ? `- Prevention: ${result.preventionMethods.join(', ')}` : ''}
-  `).join('\n');
+  let formatted = "RELEVANT MEDICAL INFORMATION:\n\n";
+  
+  results.forEach((result, index) => {
+    formatted += `CONDITION ${index + 1}: ${result.disease}\n`;
+    
+    if (result.symptoms && result.symptoms.length > 0) {
+      formatted += `- Symptoms: ${result.symptoms.join(', ')}\n`;
+    }
+    
+    if (result.treatments && result.treatments.length > 0) {
+      formatted += `- Treatments: ${result.treatments.join(', ')}\n`;
+    }
+    
+    if (result.medications && result.medications.length > 0) {
+      formatted += "- Medications:\n";
+      result.medications.forEach((med: any) => {
+        formatted += `  * ${med.name}`;
+        if (med.dosage) formatted += ` - Dosage: ${med.dosage}`;
+        formatted += '\n';
+        
+        if (med.sideEffects && med.sideEffects.length > 0) {
+          formatted += `    Side effects: ${med.sideEffects.join(', ')}\n`;
+        }
+      });
+    }
+    
+    formatted += '\n';
+  });
+  
+  return formatted;
 }
 
-// Express route for handling patient queries
-async function setupQueryEndpoint(): Promise<void> {
+// Generate response using DeepSeek LLM
+async function generateResponse(patientData: any, medicalInfo: string): Promise<string> {
+  try {
+    const { 
+      medicalHistory = [],
+      currentMedications = [],
+      knownAllergies = [],
+      currentSymptoms = []
+    } = patientData;
+    
+    const result = await llm.call([
+      {
+        role: "system",
+        content: "You are a medical information assistant. Your role is to provide relevant information based on patient data and medical knowledge. DO NOT give direct medical advice or prescriptions. Always recommend consulting with a healthcare professional."
+      },
+      {
+        role: "user",
+        content: `
+Patient Information:
+- Medical History: ${Array.isArray(medicalHistory) ? medicalHistory.join(', ') : medicalHistory || 'None provided'}
+- Current Medications: ${Array.isArray(currentMedications) ? currentMedications.join(', ') : currentMedications || 'None provided'}
+- Known Allergies: ${Array.isArray(knownAllergies) ? knownAllergies.join(', ') : knownAllergies || 'None provided'}
+- Current Symptoms: ${Array.isArray(currentSymptoms) ? currentSymptoms.join(', ') : currentSymptoms || 'None provided'}
+
+Relevant Medical Information from our database:
+${medicalInfo}
+
+Based on this information, provide a clear, informative response that:
+1. Acknowledges the symptoms and concerns
+2. Provides educational information about possible related conditions
+3. Explains general treatment approaches that are commonly used for these symptoms/conditions
+4. Emphasizes the importance of professional medical consultation
+5. Provides general wellness recommendations if appropriate
+`
+      }
+    ]);
+    
+    return result.content;
+  } catch (error) {
+    console.error("Error generating response:", error);
+    return "Sorry, I encountered an error processing your medical query. Please try again later.";
+  }
+}
+
+// Setup Express endpoint for queries
+export async function setupQueryEndpoint(): Promise<void> {
   const app = express();
-  
-  // Connect to MongoDB
-  await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/medicalAssistant', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-  } as mongoose.ConnectOptions);
-  
-  console.log('Connected to MongoDB');
-  
   app.use(express.json());
   
   // Query endpoint
   //@ts-ignore
-  
   app.post('/api/medical-query', async (req: Request, res: Response) => {
     try {
       const patientData = req.body;
-      if (!patientData) return res.status(400).json({ error: 'Patient data is required' });
       
-      const { medicalHistory = [], currentMedications = [], knownAllergies = [], currentSymptoms = [], diseases = [] } = patientData;
+      if (!patientData) {
+        return res.status(400).json({ error: 'Patient data is required' });
+      }
       
+      // Search database
       const searchResults = await searchMedicalDatabase({
-        symptoms: currentSymptoms,
-        diseases: [...diseases, ...medicalHistory.map((item: any) => item.name)],
-        drugs: currentMedications.map((med: any) => med.name || med)
+        symptoms: patientData.currentSymptoms || [],
+        diseases: patientData.diseases || patientData.medicalHistory || [],
+        medications: patientData.currentMedications || []
       });
       
-      const formattedMedicalData = formatMedicalDataForLLM(searchResults);
+      // Format data for LLM
+      const formattedData = formatMedicalData(searchResults);
       
-      const promptTemplate = await treatmentRecommendationPrompt.format({
-        medicalHistory: medicalHistory.map((item: any) => `${item.name} (${item.type})`).join(', ') || 'None',
-        currentMedications: currentMedications.map((med: any) => med.name).join(', ') || 'None',
-        knownAllergies: knownAllergies.join(', ') || 'None',
-        currentSymptoms: currentSymptoms.join(', ') || 'None',
-        relevantMedicalData: formattedMedicalData
+      // Generate response
+      const response = await generateResponse(patientData, formattedData);
+      
+      res.json({
+        response: response,
+        relatedConditions: searchResults.map(r => r.disease)
       });
-      
-      const result = await llm.invoke(promptTemplate);
-      res.json({ response: result.content, relatedConditions: searchResults.map(r => r.diseaseName) });
     } catch (error) {
-      console.error('Error processing query:', error);
+      console.error("Error processing query:", error);
       res.status(500).json({ error: 'An error occurred while processing your query' });
     }
   });
   
-  const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  // If not already using the main Express app, start it
+  if (!process.env.USING_MAIN_EXPRESS_APP) {
+    const PORT = process.env.QUERY_PORT || 3000;
+    app.listen(PORT, () => {
+      console.log(`Query Agent running on port ${PORT}`);
+    });
+  }
 }
-
-export { setupQueryEndpoint };

@@ -16,6 +16,7 @@ function ChatbotInterface() {
   const [clinicalQuery, setClinicalQuery] = useState("")
   const [recommendation, setRecommendation] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -38,26 +39,32 @@ function ChatbotInterface() {
     setIsLoading(true)
 
     try {
-      // Mock API call
-      // In a real app, this would be a call to your backend
-      setTimeout(() => {
+      const response= await axios.post("https://localhost:3000/api/medical-query", {
+      symptoms: clinicalQuery,
+        diseases: currentPatient.medicalHistory,
+        medications: currentPatient.medications
+     })
+     const ACSResponse = ({ response, setRecommendation  }) => {
+      if (response.status === 200) {
         setRecommendation(`
           <div>
-            <p><strong>Confidence:</strong> High (Based on 12 clinical guidelines and 8 recent studies)</p>
+            <p><strong>Confidence:</strong> ${response.confidence}</p>
             <h3 class="text-lg font-bold mt-4">Primary Recommendation:</h3>
             <p>Initiate ACS protocol and proceed with:</p>
             <ol class="list-decimal pl-5 mt-2">
-              <li>Immediate 12-lead ECG and continuous cardiac monitoring</li>
-              <li>Serial troponin measurements (0, 3, 6 hours)</li>
-              <li>Aspirin 325mg loading dose</li>
-              <li>Consider coronary CT angiography given patient's risk factors</li>
+              ${response.recommendations.map((item, index) => `<li key=${index}>${item}</li>`).join('')}
             </ol>
             <h3 class="text-lg font-bold mt-4">Supporting Evidence:</h3>
-            <p>Based on the patient's presentation of new-onset chest pain, history of coronary artery disease, and type 2 diabetes, the likelihood of acute coronary syndrome is high. Early intervention has been shown to significantly improve outcomes in this patient population.</p>
+            <p>${response.evidence}</p>
           </div>
-        `)
+        `);
         setIsLoading(false)
-      }, 1500)
+      }
+      return null;
+
+    };
+      ACSResponse(response.data , setRecommendation());
+      
     } catch (error) {
       console.error("Error fetching recommendations:", error)
       setIsLoading(false)
